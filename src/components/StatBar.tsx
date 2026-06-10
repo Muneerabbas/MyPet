@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -14,7 +16,11 @@ interface StatBarProps {
   value: number; // 0..100
   color: string;
   trackColor: string;
+  
+  durationMs?: number;
 }
+
+const clamp = (value: number) => Math.max(0, Math.min(100, value));
 
 export const StatBar: React.FC<StatBarProps> = ({
   emoji,
@@ -22,16 +28,28 @@ export const StatBar: React.FC<StatBarProps> = ({
   value,
   color,
   trackColor,
+  durationMs = 650,
 }) => {
   const progress = useSharedValue(0);
+  const [display, setDisplay] = useState(Math.round(clamp(value)));
 
   useEffect(() => {
-    const clamped = Math.max(0, Math.min(100, value));
-    progress.value = withTiming(clamped, {
-      duration: 650,
+    progress.value = withTiming(clamp(value), {
+      duration: durationMs,
       easing: Easing.out(Easing.cubic),
     });
-  }, [value, progress]);
+  }, [value, durationMs, progress]);
+
+  // Keep the % label in sync with the animated fill.
+  useAnimatedReaction(
+    () => Math.round(progress.value),
+    (current, previous) => {
+      if (current !== previous) {
+        runOnJS(setDisplay)(current);
+      }
+    },
+    [],
+  );
 
   const fillStyle = useAnimatedStyle(() => ({
     width: `${progress.value}%`,
@@ -42,7 +60,7 @@ export const StatBar: React.FC<StatBarProps> = ({
       <View style={styles.header}>
         <Text style={styles.emoji}>{emoji}</Text>
         <Text style={styles.label}>{label}</Text>
-        <Text style={[styles.value, { color }]}>{Math.round(value)}%</Text>
+        <Text style={[styles.value, { color }]}>{display}%</Text>
       </View>
 
       <View style={[styles.track, { backgroundColor: trackColor }]}>

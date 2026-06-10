@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ImageBackground, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,11 +12,12 @@ import { gradients, spacing } from './theme';
 import { useSelector } from 'react-redux';
 import { RootState } from './store/store';
 import { useDispatch } from 'react-redux';
-import { applyOfflineDecay, setLastOpened } from './store/petSlice';
+import { applyOfflineDecay, getMood, setLastOpened } from './store/petSlice';
 import { feedPet, playPet, sleepPet } from './store/petSlice';
 import { ACTION_POSE, DEFAULT_POSE, TAP_POSE } from './petPoses';
 
 const backgroundImage = require('./assets/images/gameBack.png');
+const DEFAULT_STAT_DURATION = 650;
 
 export const PetScreen: React.FC = () => {
   const pet = useSelector((state: RootState) => state.pet);
@@ -26,6 +27,58 @@ export const PetScreen: React.FC = () => {
   // Pose is driven only by the action buttons; defaults until one is pressed.
   const [pose, setPose] = useState<string>(DEFAULT_POSE);
 
+  // Stat bars animate over this duration; synced to the running animation.
+  const [statDuration, setStatDuration] = useState(DEFAULT_STAT_DURATION);
+
+  // The stat change is applied when the animation starts, so the bars fill
+  // gradually over the same time the model is animating.
+  const pendingAction = useRef<(() => void) | null>(null);
+  const fallback = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runPendingAction = (durationMs: number) => {
+    if (fallback.current) {
+      clearTimeout(fallback.current);
+      fallback.current = null;
+    }
+    if (pendingAction.current) {
+      const run = pendingAction.current;
+      pendingAction.current = null;
+      setStatDuration(durationMs);
+      run();
+    }
+  };
+
+  const triggerAction = (action: () => void, actionPose: string) => {
+    pendingAction.current = action;
+    setPose(actionPose);
+
+    // Safety net: if the viewer never reports a start, apply after a short wait.
+    if (fallback.current) {
+      clearTimeout(fallback.current);
+    }
+    fallback.current = setTimeout(() => runPendingAction(900), 1200);
+  };
+
+  const handlePoseStart = (durationMs: number) => {
+    runPendingAction(durationMs);
+  };
+
+  const handlePoseComplete = () => {
+    setPose(DEFAULT_POSE);
+    setStatDuration(DEFAULT_STAT_DURATION);
+  };
+
+  // Floating emoji above the chicken: 💤 while sleeping, else mood-based.
+  const mood = getMood(pet);
+  const bubbleEmoji =
+    pose === ACTION_POSE.sleep
+      ? '💤'
+      : mood === 'happy'
+      ? '❤️'
+      : mood === 'sad'
+      ? '😢'
+      : null;
+
   useEffect(() => {
     const now = Date.now();
     const hours = (now - pet.lastOpened) / (1000 * 60);
@@ -34,6 +87,15 @@ export const PetScreen: React.FC = () => {
     dispatch(setLastOpened(now));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(
+    () => () => {
+      if (fallback.current) {
+        clearTimeout(fallback.current);
+      }
+    },
+    [],
+  );
 
   return (
     <ImageBackground source={backgroundImage} style={styles.root} resizeMode="cover">
@@ -55,6 +117,7 @@ export const PetScreen: React.FC = () => {
               value={pet.happiness}
               color="#FF7BAC"
               trackColor="#FFD7E6"
+              durationMs={statDuration}
             />
             <StatBar
               emoji="🍔"
@@ -62,6 +125,7 @@ export const PetScreen: React.FC = () => {
               value={pet.hunger}
               color="#FFA64D"
               trackColor="#FFE6CC"
+              durationMs={statDuration}
             />
             <StatBar
               emoji="⚡"
@@ -69,6 +133,7 @@ export const PetScreen: React.FC = () => {
               value={pet.energy}
               color="#5CC8FF"
               trackColor="#D6F1FF"
+              durationMs={statDuration}
             />
           </GlassCard>
         </View>
@@ -76,7 +141,9 @@ export const PetScreen: React.FC = () => {
         <View style={styles.stageWrap}>
           <PetStage
             pose={pose}
-            onPoseComplete={() => setPose(DEFAULT_POSE)}
+            bubbleEmoji={bubbleEmoji}
+            onPoseComplete={handlePoseComplete}
+            onPoseStart={handlePoseStart}
             onTap={() => setPose(TAP_POSE)}
           />
         </View>
@@ -87,30 +154,21 @@ export const PetScreen: React.FC = () => {
               icon="🍔"
               label="Feed"
               colors={gradients.feed}
-              onPress={() => {
-                dispatch(feedPet());
-                setPose(ACTION_POSE.feed);
-              }}
+              onPress={() => triggerAction(() => dispatch(feedPet()), ACTION_POSE.feed)}
             />
             <View style={styles.gap} />
             <ActionButton
               icon="🎾"
               label="Play"
               colors={gradients.play}
-              onPress={() => {
-                dispatch(playPet());
-                setPose(ACTION_POSE.play);
-              }}
+              onPress={() => triggerAction(() => dispatch(playPet()), ACTION_POSE.play)}
             />
             <View style={styles.gap} />
             <ActionButton
               icon="😴"
               label="Sleep"
               colors={gradients.sleep}
-              onPress={() => {
-                dispatch(sleepPet());
-                setPose(ACTION_POSE.sleep);
-              }}
+              onPress={() => triggerAction(() => dispatch(sleepPet()), ACTION_POSE.sleep)}
             />
           </View>
 

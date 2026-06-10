@@ -21,6 +21,8 @@ interface ChickenViewerProps {
   style?: ViewStyle;
   /** Called once a one-shot pose animation finishes playing. */
   onPoseComplete?: () => void;
+  /** Called when a pose animation starts, with its duration in ms. */
+  onPoseStart?: (durationMs: number) => void;
   /** Called when the user taps the chicken. */
   onTap?: () => void;
 }
@@ -133,9 +135,16 @@ const buildHtml = (modelDataUri: string) => `<!DOCTYPE html>
       // Watch the timeline and stop after exactly one full cycle: either the
       // time reaches the clip duration, or it wraps back toward zero.
       let prev = 0;
+      let started = false;
       const watch = () => {
         const t = mv.currentTime;
         const dur = mv.duration;
+
+        // Report duration once known so RN can sync a progress bar.
+        if (!started && dur && isFinite(dur) && dur > 0) {
+          started = true;
+          window.ReactNativeWebView?.postMessage('start:' + dur);
+        }
 
         const wrapped = t + 0.0001 < prev;
         const reachedEnd = dur && isFinite(dur) && dur > 0 && t >= dur - 0.03;
@@ -171,6 +180,7 @@ export const ChickenViewer: React.FC<ChickenViewerProps> = ({
   height,
   style,
   onPoseComplete,
+  onPoseStart,
   onTap,
 }) => {
   const webViewRef = useRef<WebView>(null);
@@ -222,11 +232,16 @@ export const ChickenViewer: React.FC<ChickenViewerProps> = ({
         onPoseComplete?.();
       } else if (data === 'tap') {
         onTap?.();
+      } else if (data.startsWith('start:')) {
+        const seconds = parseFloat(data.slice(6));
+        if (!Number.isNaN(seconds)) {
+          onPoseStart?.(seconds * 1000);
+        }
       } else if (data.startsWith('error:')) {
         setLoadError(data.slice(6));
       }
     },
-    [pose, sendPose, onPoseComplete, onTap],
+    [pose, sendPose, onPoseComplete, onPoseStart, onTap],
   );
 
   return (
