@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
@@ -14,6 +14,7 @@ import { colors, gradients, spacing } from './theme';
 import { useSelector } from 'react-redux';
 import { RootState } from './store/store';
 import { useDispatch } from 'react-redux';
+import { decayStats, getMood } from './store/petSlice';
 import {
   feedPet,
   playPet,
@@ -39,7 +40,14 @@ export const PetScreen: React.FC = () => {
   const dispatch = useDispatch();
 
   const insets = useSafeAreaInsets();
-
+  const mood = getMood(pet);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      dispatch(decayStats());
+    }, 10000);
+  
+    return () => clearInterval(timer);
+  }, []);
   return (
     <View style={styles.root}>
       {/* Pastel backdrop */}
@@ -85,7 +93,7 @@ export const PetScreen: React.FC = () => {
 
         {/* Pet */}
         <View style={styles.stageWrap}>
-          <PetStage mood={'neutral'} />
+          <PetStage mood={mood} />
         </View>
 
         {/* Actions */}
