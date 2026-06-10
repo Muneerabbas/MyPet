@@ -33,6 +33,9 @@ const petSlice = createSlice({
 
   reducers: {
     feedPet: state => {
+      if (state.hunger >= 100) {
+        return;
+      }
       state.hunger = clamp(state.hunger + 20);
       state.happiness = clamp(state.happiness + 4);
       state.energy = clamp(state.energy + 2);
@@ -42,6 +45,9 @@ const petSlice = createSlice({
     },
 
     playPet: state => {
+      if (state.energy <= 0) {
+        return;
+      }
       state.happiness = clamp(state.happiness + 20);
       state.energy = clamp(state.energy - 12);
       state.hunger = clamp(state.hunger - 6);
@@ -52,6 +58,9 @@ const petSlice = createSlice({
     },
 
     sleepPet: state => {
+      if (state.energy >= 100) {
+        return;
+      }
       state.energy = clamp(state.energy + 25);
       state.hunger = clamp(state.hunger - 8);
       state.happiness = clamp(state.happiness + 3);
@@ -61,6 +70,9 @@ const petSlice = createSlice({
     },
 
     decayStats: state => {
+      if (state.hunger <= 0 || state.happiness <= 0 || state.energy <= 0) {
+        return;
+      }
       state.hunger = clamp(state.hunger - 1);
       state.happiness = clamp(state.happiness - 1);
       state.energy = clamp(state.energy - 1);
@@ -73,6 +85,28 @@ const petSlice = createSlice({
     ) => {
       state.lastOpened = action.payload;
     },
+    applyOfflineDecay: (
+      state,
+      action
+    ) => {
+      const elapsedMinutes =
+        action.payload;
+    
+      const decay =
+        Math.min(
+          elapsedMinutes * 5,
+          40
+        );
+    
+      state.hunger =
+        clamp(state.hunger - decay);
+    
+      state.energy =
+        clamp(state.energy - decay);
+    
+      state.happiness =
+        clamp(state.happiness - decay);
+    }
    
   },
 });
@@ -107,6 +141,7 @@ export const {
   sleepPet,
   decayStats,
   setLastOpened,
+  applyOfflineDecay
 } = petSlice.actions;
 
 export default petSlice.reducer;

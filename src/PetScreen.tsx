@@ -14,7 +14,7 @@ import { colors, gradients, spacing } from './theme';
 import { useSelector } from 'react-redux';
 import { RootState } from './store/store';
 import { useDispatch } from 'react-redux';
-import { decayStats, getMood } from './store/petSlice';
+import { applyOfflineDecay, decayStats, getMood, setLastOpened } from './store/petSlice';
 import {
   feedPet,
   playPet,
@@ -42,12 +42,21 @@ export const PetScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const mood = getMood(pet);
   useEffect(() => {
-    const timer = setInterval(() => {
-      dispatch(decayStats());
-    }, 10000);
+    const now = Date.now();
   
-    return () => clearInterval(timer);
+    const hours =
+      (now - pet.lastOpened) /
+      (1000  * 60);
+  
+    dispatch(
+      applyOfflineDecay(hours),
+    );
+  
+    dispatch(
+      setLastOpened(now),
+    );
   }, []);
+  
   return (
     <View style={styles.root}>
       {/* Pastel backdrop */}
