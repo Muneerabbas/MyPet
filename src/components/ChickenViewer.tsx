@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import WebView, { WebViewMessageEvent } from 'react-native-webview';
 import { loadGlbDataUri } from '../utils/loadGlbDataUri';
+import { MODEL_VIEWER_JS_B64 } from '../utils/modelViewerSource';
 
 /**
  * `pose` is the GLB clip name to loop (e.g. "bunnyhop", "idle01"), or
@@ -32,7 +33,6 @@ const buildHtml = (modelDataUri: string) => `<!DOCTYPE html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
   <style>
     html, body {
       margin: 0;
@@ -68,7 +68,34 @@ const buildHtml = (modelDataUri: string) => `<!DOCTYPE html>
     environment-image="neutral"
   ></model-viewer>
   <script type="module">
+    const rn = window.ReactNativeWebView;
+    const dbg = (msg) => rn?.postMessage('dbg:' + msg);
+
+    window.onerror = (message, _src, _line, _col, err) => {
+      rn?.postMessage('error:' + (err?.stack || message));
+    };
+    window.addEventListener('unhandledrejection', (e) => {
+      rn?.postMessage('error:unhandled-rejection:' + (e.reason?.stack || e.reason));
+    });
+
+    try {
+      dbg('decoding-model-viewer');
+      const src = atob('${MODEL_VIEWER_JS_B64}');
+      dbg('creating-blob');
+      const blob = new Blob([src], { type: 'text/javascript' });
+      const blobUrl = URL.createObjectURL(blob);
+      dbg('importing-blob:' + blobUrl.slice(0, 40));
+      await import(blobUrl);
+      URL.revokeObjectURL(blobUrl);
+      dbg('import-done');
+    } catch (e) {
+      rn?.postMessage('error:mv-load:' + (e?.stack || e?.message || e));
+      throw e;
+    }
+
+    dbg('waiting-for-custom-element');
     await customElements.whenDefined('model-viewer');
+    dbg('custom-element-ready');
 
     const mv = document.getElementById('mv');
 
@@ -76,7 +103,6 @@ const buildHtml = (modelDataUri: string) => `<!DOCTYPE html>
       mv.updateFraming();
       const orbit = mv.getCameraOrbit();
       const radius = (orbit.radius * 0.82).toFixed(4) + 'm';
-      // Lock the radius so per-frame animation bounds can't re-zoom the model.
       mv.minCameraOrbit = 'auto auto ' + radius;
       mv.maxCameraOrbit = 'auto auto ' + radius;
       mv.cameraOrbit = orbit.theta + 'rad ' + orbit.phi + 'rad ' + radius;
@@ -85,19 +111,17 @@ const buildHtml = (modelDataUri: string) => `<!DOCTYPE html>
     }
 
     mv.addEventListener('load', () => {
-      // Frame once the model is in, then again next frame after the
-      // animation's first pose so the locked size is stable.
+      dbg('model-load-event');
       lockFraming();
       requestAnimationFrame(lockFraming);
-      window.ReactNativeWebView?.postMessage('ready');
+      rn?.postMessage('ready');
     });
 
     mv.addEventListener('error', (event) => {
       const msg = event.detail?.sourceError?.message || 'model-viewer error';
-      window.ReactNativeWebView?.postMessage('error:' + msg);
+      rn?.postMessage('error:' + msg);
     });
 
-    // Clip used for the calm standing "static" look (falls back to rest pose).
     const STATIC_CLIP = 'idle01';
     let watchRaf = null;
 
@@ -131,19 +155,15 @@ const buildHtml = (modelDataUri: string) => `<!DOCTYPE html>
       mv.currentTime = 0;
       mv.play();
 
-      // model-viewer loops by default and ignores repetitions on some builds.
-      // Watch the timeline and stop after exactly one full cycle: either the
-      // time reaches the clip duration, or it wraps back toward zero.
       let prev = 0;
       let started = false;
       const watch = () => {
         const t = mv.currentTime;
         const dur = mv.duration;
 
-        // Report duration once known so RN can sync a progress bar.
         if (!started && dur && isFinite(dur) && dur > 0) {
           started = true;
-          window.ReactNativeWebView?.postMessage('start:' + dur);
+          rn?.postMessage('start:' + dur);
         }
 
         const wrapped = t + 0.0001 < prev;
@@ -152,7 +172,7 @@ const buildHtml = (modelDataUri: string) => `<!DOCTYPE html>
         if (wrapped || reachedEnd) {
           watchRaf = null;
           goStatic();
-          window.ReactNativeWebView?.postMessage('finished');
+          rn?.postMessage('finished');
           return;
         }
 
@@ -162,14 +182,9 @@ const buildHtml = (modelDataUri: string) => `<!DOCTYPE html>
       watchRaf = requestAnimationFrame(watch);
     };
 
-    // Tapping anywhere on the model notifies React Native.
     document.body.addEventListener('pointerup', () => {
-      window.ReactNativeWebView?.postMessage('tap');
+      rn?.postMessage('tap');
     });
-
-    window.onerror = (message) => {
-      window.ReactNativeWebView?.postMessage('error:' + message);
-    };
   </script>
 </body>
 </html>`;
@@ -239,6 +254,11 @@ export const ChickenViewer: React.FC<ChickenViewerProps> = ({
         }
       } else if (data.startsWith('error:')) {
         setLoadError(data.slice(6));
+      } else if (data.startsWith('dbg:')) {
+        if (__DEV__) {
+          console.log('[ChickenViewer]', data.slice(4));
+        }
+        setLoadError(data.slice(4));
       }
     },
     [pose, sendPose, onPoseComplete, onPoseStart, onTap],
