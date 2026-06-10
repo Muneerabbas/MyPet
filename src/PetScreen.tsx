@@ -1,161 +1,150 @@
-import React, { useCallback, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ImageBackground, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 
 import { ActionButton } from './components/ActionButton';
-import { Gradient } from './components/Gradient';
 import { GlassCard } from './components/GlassCard';
 import { PetStage } from './components/PetStage';
 import { StatBar } from './components/StatBar';
 import { TopBar } from './components/TopBar';
 import { XPBar } from './components/XPBar';
-import { colors, gradients, spacing } from './theme';
+import { gradients, spacing } from './theme';
 import { useSelector } from 'react-redux';
 import { RootState } from './store/store';
 import { useDispatch } from 'react-redux';
-import { applyOfflineDecay, decayStats, getMood, setLastOpened } from './store/petSlice';
-import {
-  feedPet,
-  playPet,
-  sleepPet,
-} from './store/petSlice';
+import { applyOfflineDecay, setLastOpened } from './store/petSlice';
+import { feedPet, playPet, sleepPet } from './store/petSlice';
+import { ACTION_POSE, DEFAULT_POSE, TAP_POSE } from './petPoses';
 
-const haptic = () => {
-  try {
-    ReactNativeHapticFeedback.trigger('impactMedium', {
-      enableVibrateFallback: true,
-      ignoreAndroidSystemSettings: false,
-    });
-  } catch {
-
-  }
-};
+const backgroundImage = require('./assets/images/gameBack.png');
 
 export const PetScreen: React.FC = () => {
-
-  const pet = useSelector(
-    (state: RootState) => state.pet,
-  );
+  const pet = useSelector((state: RootState) => state.pet);
   const dispatch = useDispatch();
-
   const insets = useSafeAreaInsets();
-  const mood = getMood(pet);
+
+  // Pose is driven only by the action buttons; defaults until one is pressed.
+  const [pose, setPose] = useState<string>(DEFAULT_POSE);
+
   useEffect(() => {
     const now = Date.now();
-  
-    const hours =
-      (now - pet.lastOpened) /
-      (1000  * 60);
-  
-    dispatch(
-      applyOfflineDecay(hours),
-    );
-  
-    dispatch(
-      setLastOpened(now),
-    );
+    const hours = (now - pet.lastOpened) / (1000 * 60);
+
+    dispatch(applyOfflineDecay(hours));
+    dispatch(setLastOpened(now));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   return (
-    <View style={styles.root}>
-      {/* Pastel backdrop */}
-      <Gradient
-        colors={[colors.bgTop, colors.bgBottom]}
-        steps={24}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
+    <ImageBackground source={backgroundImage} style={styles.root} resizeMode="cover">
+      <View
+        style={[
           styles.content,
-          { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.lg },
+          {
+            paddingTop: insets.top + spacing.sm,
+            paddingBottom: insets.bottom + spacing.md,
+          },
         ]}>
-        {/* Top: coins + level */}
-        <TopBar coins={pet.coins} level={pet.level} />
-      
-        {/* Stats */}
-        <GlassCard style={styles.statsCard}>
-          <StatBar
-            emoji="❤️"
-            label="Happiness"
-            value={pet.happiness}
-            color={colors.happiness}
-            trackColor={colors.happinessSoft}
-          />
-          <StatBar
-            emoji="🍔"
-            label="Hunger"
-            value={pet.hunger}
-            color={colors.hunger}
-            trackColor={colors.hungerSoft}
-          />
-          <StatBar
-            emoji="⚡"
-            label="Energy"
-            value={pet.energy}
-            color={colors.energy}
-            trackColor={colors.energySoft}
-          />
-        </GlassCard>
+        <View style={styles.header}>
+          <TopBar coins={pet.coins} level={pet.level} />
 
-        {/* Pet */}
+          <GlassCard style={styles.statsCard}>
+            <StatBar
+              emoji="❤️"
+              label="Happiness"
+              value={pet.happiness}
+              color="#FF7BAC"
+              trackColor="#FFD7E6"
+            />
+            <StatBar
+              emoji="🍔"
+              label="Hunger"
+              value={pet.hunger}
+              color="#FFA64D"
+              trackColor="#FFE6CC"
+            />
+            <StatBar
+              emoji="⚡"
+              label="Energy"
+              value={pet.energy}
+              color="#5CC8FF"
+              trackColor="#D6F1FF"
+            />
+          </GlassCard>
+        </View>
+
         <View style={styles.stageWrap}>
-          <PetStage mood={mood} />
-        </View>
-
-        {/* Actions */}
-        <View style={styles.actions}>
-          <ActionButton
-            icon="🍔"
-            label="Feed"
-            colors={gradients.feed}
-            onPress={() => dispatch(feedPet())}
-          />
-          <View style={styles.gap} />
-          <ActionButton
-            icon="🎾"
-            label="Play"
-            colors={gradients.play}
-            onPress={() => dispatch(playPet())}
-          />
-          <View style={styles.gap} />
-          <ActionButton
-            icon="😴"
-            label="Sleep"
-            colors={gradients.sleep}
-            onPress={() => dispatch(sleepPet())}
+          <PetStage
+            pose={pose}
+            onPoseComplete={() => setPose(DEFAULT_POSE)}
+            onTap={() => setPose(TAP_POSE)}
           />
         </View>
 
-        {/* Bottom: XP + message */}
-        <GlassCard style={styles.xpCard} strong>
-          <XPBar xp={pet.xp} message={'Your pet is doing okay — keep it up!'} />
-        </GlassCard>
-      </ScrollView>
-    </View>
+        <View style={styles.footer}>
+          <View style={styles.actions}>
+            <ActionButton
+              icon="🍔"
+              label="Feed"
+              colors={gradients.feed}
+              onPress={() => {
+                dispatch(feedPet());
+                setPose(ACTION_POSE.feed);
+              }}
+            />
+            <View style={styles.gap} />
+            <ActionButton
+              icon="🎾"
+              label="Play"
+              colors={gradients.play}
+              onPress={() => {
+                dispatch(playPet());
+                setPose(ACTION_POSE.play);
+              }}
+            />
+            <View style={styles.gap} />
+            <ActionButton
+              icon="😴"
+              label="Sleep"
+              colors={gradients.sleep}
+              onPress={() => {
+                dispatch(sleepPet());
+                setPose(ACTION_POSE.sleep);
+              }}
+            />
+          </View>
+
+          <GlassCard style={styles.xpCard} strong>
+            <XPBar xp={pet.xp} message="Your pet is doing okay — keep it up!" />
+          </GlassCard>
+        </View>
+      </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.bgMid,
   },
   content: {
-    flexGrow: 1,
+    flex: 1,
+  },
+  header: {
     paddingHorizontal: spacing.lg,
-    justifyContent: 'space-between',
   },
   statsCard: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
   stageWrap: {
-    alignItems: 'center',
-    marginVertical: spacing.lg,
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  footer: {
+    paddingHorizontal: spacing.lg,
   },
   actions: {
     flexDirection: 'row',
@@ -165,7 +154,7 @@ const styles = StyleSheet.create({
     width: spacing.md,
   },
   xpCard: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
   },
