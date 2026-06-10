@@ -1,11 +1,10 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, {
-  Easing,
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
   withSequence,
   withSpring,
   withTiming,
@@ -46,21 +45,8 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   const lift = useSharedValue(0);
   const iconScale = useSharedValue(1);
 
-  // Entrance: fade + rise, staggered by index.
-  const enter = useSharedValue(0);
-  useEffect(() => {
-    enter.value = withDelay(
-      120 + index * 90,
-      withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }),
-    );
-  }, [enter, index]);
-
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: enter.value,
-    transform: [
-      { scale: scale.value },
-      { translateY: lift.value + (1 - enter.value) * 18 },
-    ],
+    transform: [{ scale: scale.value }, { translateY: lift.value }],
   }));
 
   const iconStyle = useAnimatedStyle(() => ({
@@ -93,7 +79,12 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
       onPress={handlePress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}>
-      <Animated.View style={[styles.shadowWrap, shadow.soft, animatedStyle]}>
+      <Animated.View
+        entering={FadeInDown.delay(120 + index * 90)
+          .duration(420)
+          .springify()
+          .damping(14)}
+        style={[styles.shadowWrap, shadow.soft, animatedStyle]}>
         <Gradient
           colors={gradientColors}
           borderRadius={radius.md}

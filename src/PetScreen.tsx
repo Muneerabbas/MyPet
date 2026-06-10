@@ -21,6 +21,7 @@ import {
 } from './store/petSlice';
 import { feedPet, playPet, sleepPet } from './store/petSlice';
 import { ACTION_POSE, DEFAULT_POSE, TAP_POSE } from './petPoses';
+import AudioManager, { EffectName } from './services/audioManager';
 
 const COINS_PER_LEVEL = 25;
 
@@ -32,21 +33,27 @@ export const PetScreen: React.FC = () => {
   const dispatch = useDispatch();
   const insets = useSafeAreaInsets();
 
-  // Pose is driven only by the action buttons; defaults until one is pressed.
   const [pose, setPose] = useState<string>(DEFAULT_POSE);
 
-  // Stat bars animate over this duration; synced to the running animation.
+  
   const [statDuration, setStatDuration] = useState(DEFAULT_STAT_DURATION);
 
-  // Level-up celebration popup.
   const [levelUp, setLevelUp] = useState<{ level: number; coins: number } | null>(
     null,
   );
   const prevLevel = useRef(pet.level);
+  useEffect(() => {
+    AudioManager.startMusic();
+    AudioManager.preloadEffects();
 
+    return () => {
+      AudioManager.release();
+    };
+  }, []);
   useEffect(() => {
     if (pet.level > prevLevel.current) {
       const gained = pet.level - prevLevel.current;
+      AudioManager.playEffect('levelup');
       setLevelUp({ level: pet.level, coins: gained * COINS_PER_LEVEL });
     }
     prevLevel.current = pet.level;
@@ -70,7 +77,12 @@ export const PetScreen: React.FC = () => {
     }
   };
 
-  const triggerAction = (action: () => void, actionPose: string) => {
+  const triggerAction = (
+    action: () => void,
+    actionPose: string,
+    effect: EffectName,
+  ) => {
+    AudioManager.playEffect(effect);
     pendingAction.current = action;
     setPose(actionPose);
 
@@ -90,7 +102,7 @@ export const PetScreen: React.FC = () => {
     setStatDuration(DEFAULT_STAT_DURATION);
   };
 
-  // Floating emoji above the chicken: 💤 while sleeping, else mood-based.
+ 
   const mood = getMood(pet);
   const bubbleEmoji =
     pose === ACTION_POSE.sleep
@@ -166,7 +178,10 @@ export const PetScreen: React.FC = () => {
             bubbleEmoji={bubbleEmoji}
             onPoseComplete={handlePoseComplete}
             onPoseStart={handlePoseStart}
-            onTap={() => setPose(TAP_POSE)}
+            onTap={() => {
+              AudioManager.playEffect('hit');
+              setPose(TAP_POSE);
+            }}
           />
         </View>
 
@@ -177,7 +192,9 @@ export const PetScreen: React.FC = () => {
               label="Feed"
               index={0}
               colors={gradients.feed}
-              onPress={() => triggerAction(() => dispatch(feedPet()), ACTION_POSE.feed)}
+              onPress={() =>
+                triggerAction(() => dispatch(feedPet()), ACTION_POSE.feed, 'feed')
+              }
             />
             <View style={styles.gap} />
             <ActionButton
@@ -185,7 +202,9 @@ export const PetScreen: React.FC = () => {
               label="Play"
               index={1}
               colors={gradients.play}
-              onPress={() => triggerAction(() => dispatch(playPet()), ACTION_POSE.play)}
+              onPress={() =>
+                triggerAction(() => dispatch(playPet()), ACTION_POSE.play, 'play')
+              }
             />
             <View style={styles.gap} />
             <ActionButton
@@ -193,7 +212,9 @@ export const PetScreen: React.FC = () => {
               label="Sleep"
               index={2}
               colors={gradients.sleep}
-              onPress={() => triggerAction(() => dispatch(sleepPet()), ACTION_POSE.sleep)}
+              onPress={() =>
+                triggerAction(() => dispatch(sleepPet()), ACTION_POSE.sleep, 'sleep')
+              }
             />
           </View>
 

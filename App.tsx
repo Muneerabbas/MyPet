@@ -12,6 +12,7 @@ import { PetScreen } from './src/PetScreen';
 import { store } from './src/store/store';
 
 function App(): React.JSX.Element {
+  
   return (
     
     <SafeAreaProvider>
