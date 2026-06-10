@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -14,21 +18,53 @@ interface ActionButtonProps {
   label: string;
   colors: [string, string];
   onPress: () => void;
+  /** Stagger index for the entrance animation. */
+  index?: number;
 }
 
 const SPRING = { damping: 12, stiffness: 220, mass: 0.6 };
+
+const triggerHaptic = () => {
+  try {
+    ReactNativeHapticFeedback.trigger('impactLight', {
+      enableVibrateFallback: true,
+      ignoreAndroidSystemSettings: false,
+    });
+  } catch {
+    // Haptics are best-effort; ignore if unavailable.
+  }
+};
 
 export const ActionButton: React.FC<ActionButtonProps> = ({
   icon,
   label,
   colors: gradientColors,
   onPress,
+  index = 0,
 }) => {
   const scale = useSharedValue(1);
   const lift = useSharedValue(0);
+  const iconScale = useSharedValue(1);
+
+  // Entrance: fade + rise, staggered by index.
+  const enter = useSharedValue(0);
+  useEffect(() => {
+    enter.value = withDelay(
+      120 + index * 90,
+      withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [enter, index]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { translateY: lift.value }],
+    opacity: enter.value,
+    transform: [
+      { scale: scale.value },
+      { translateY: lift.value + (1 - enter.value) * 18 },
+    ],
+  }));
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
   }));
 
   const onPressIn = () => {
@@ -41,10 +77,20 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
     lift.value = withSpring(0, SPRING);
   };
 
+  const handlePress = () => {
+    triggerHaptic();
+    // Playful icon pop on each press.
+    iconScale.value = withSequence(
+      withSpring(1.28, { damping: 8, stiffness: 260 }),
+      withSpring(1, SPRING),
+    );
+    onPress();
+  };
+
   return (
     <Pressable
       style={styles.pressable}
-      onPress={onPress}
+      onPress={handlePress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}>
       <Animated.View style={[styles.shadowWrap, shadow.soft, animatedStyle]}>
@@ -52,9 +98,9 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
           colors={gradientColors}
           borderRadius={radius.md}
           style={styles.button}>
-          {/* Glossy highlight */}
-          <View style={styles.gloss} pointerEvents="none" />
-          <Text style={styles.icon}>{icon}</Text>
+          {/* Soft top sheen (thin highlight, no hard edge) */}
+          <View style={styles.sheen} pointerEvents="none" />
+          <Animated.Text style={[styles.icon, iconStyle]}>{icon}</Animated.Text>
           <Text style={styles.label}>{label}</Text>
         </Gradient>
       </Animated.View>
@@ -76,15 +122,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.5)',
   },
-  gloss: {
+  sheen: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '42%',
-    backgroundColor: 'rgba(255,255,255,0.28)',
-    borderTopLeftRadius: radius.md,
-    borderTopRightRadius: radius.md,
+    top: 6,
+    left: 10,
+    right: 10,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.45)',
   },
   icon: {
     fontSize: 30,

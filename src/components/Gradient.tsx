@@ -55,11 +55,26 @@ export const Gradient: React.FC<GradientProps> = ({
     );
   }, [colors, steps]);
 
+  // Each band is positioned absolutely as a percentage of the height and is
+  // made slightly taller than its slot so consecutive bands overlap. This
+  // overlap hides the sub-pixel rounding seams that "flex: 1" bands produce.
+  const slice = 100 / steps;
+
   return (
     <View style={[styles.container, { borderRadius }, style]}>
       <View style={[StyleSheet.absoluteFill, { borderRadius, overflow: 'hidden' }]}>
         {bands.map((color, i) => (
-          <View key={i} style={[styles.band, { backgroundColor: color }]} />
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: `${slice * i}%`,
+              height: `${slice + 1}%`,
+              backgroundColor: color,
+            }}
+          />
         ))}
       </View>
       {children}
@@ -70,9 +85,5 @@ export const Gradient: React.FC<GradientProps> = ({
 const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
-  },
-  band: {
-    flex: 1,
-    width: '100%',
   },
 });

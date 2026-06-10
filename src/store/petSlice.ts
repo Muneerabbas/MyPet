@@ -135,6 +135,45 @@ export const getMood = (
 
   return 'neutral';
 };
+
+/**
+ * A short, friendly status line shown under the XP bar. It reacts to whichever
+ * need is most pressing so the message always feels alive and relevant.
+ */
+export const getStatusMessage = (state: PetState): string => {
+  const { hunger, happiness, energy } = state;
+
+  // Urgent needs first (lowest critical stat wins).
+  const critical = [
+    { key: 'hunger', value: hunger, msg: "I'm starving! Please feed me 🍔" },
+    { key: 'energy', value: energy, msg: "I'm so sleepy... time for a nap 😴" },
+    { key: 'happiness', value: happiness, msg: 'I feel a little lonely 🥺' },
+  ]
+    .filter(s => s.value < 25)
+    .sort((a, b) => a.value - b.value);
+
+  if (critical.length > 0) {
+    return critical[0].msg;
+  }
+
+  // Mild needs.
+  if (hunger < 45) {
+    return 'A little snack would be nice 🍪';
+  }
+  if (energy < 45) {
+    return 'Getting a bit tired... ⚡';
+  }
+  if (happiness < 45) {
+    return "Let's play together! 🎾";
+  }
+
+  // Thriving.
+  if (hunger >= 70 && happiness >= 70 && energy >= 70) {
+    return "I'm so happy with you! 💖";
+  }
+
+  return "I'm doing great — keep it up! 🌟";
+};
 export const {
   feedPet,
   playPet,

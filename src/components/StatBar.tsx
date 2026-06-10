@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -6,6 +6,7 @@ import Animated, {
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { colors, radius } from '../theme';
@@ -16,7 +17,6 @@ interface StatBarProps {
   value: number; // 0..100
   color: string;
   trackColor: string;
-  
   durationMs?: number;
 }
 
@@ -31,16 +31,26 @@ export const StatBar: React.FC<StatBarProps> = ({
   durationMs = 650,
 }) => {
   const progress = useSharedValue(0);
-  const [display, setDisplay] = useState(Math.round(clamp(value)));
+  const sheenOpacity = useSharedValue(0);
+  const [display, setDisplay] = React.useState(Math.round(clamp(value)));
+  const prevValue = useRef(value);
 
   useEffect(() => {
-    progress.value = withTiming(clamp(value), {
+    const clamped = clamp(value);
+    const gained = value > prevValue.current;
+    progress.value = withTiming(clamped, {
       duration: durationMs,
       easing: Easing.out(Easing.cubic),
     });
-  }, [value, durationMs, progress]);
+    if (gained) {
+      sheenOpacity.value = withSequence(
+        withTiming(1, { duration: 120 }),
+        withTiming(0, { duration: 500 }),
+      );
+    }
+    prevValue.current = value;
+  }, [value, durationMs, progress, sheenOpacity]);
 
-  // Keep the % label in sync with the animated fill.
   useAnimatedReaction(
     () => Math.round(progress.value),
     (current, previous) => {
@@ -51,9 +61,8 @@ export const StatBar: React.FC<StatBarProps> = ({
     [],
   );
 
-  const fillStyle = useAnimatedStyle(() => ({
-    width: `${progress.value}%`,
-  }));
+  const fillStyle = useAnimatedStyle(() => ({ width: `${progress.value}%` }));
+  const sheenStyle = useAnimatedStyle(() => ({ opacity: sheenOpacity.value }));
 
   return (
     <View style={styles.container}>
@@ -65,8 +74,8 @@ export const StatBar: React.FC<StatBarProps> = ({
 
       <View style={[styles.track, { backgroundColor: trackColor }]}>
         <Animated.View style={[styles.fill, { backgroundColor: color }, fillStyle]}>
-          {/* Glossy top sheen on the fill */}
           <View style={styles.fillSheen} pointerEvents="none" />
+          <Animated.View style={[styles.flashOverlay, sheenStyle]} pointerEvents="none" />
         </Animated.View>
       </View>
     </View>
@@ -80,11 +89,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 7,
     marginBottom: 6,
   },
   emoji: {
     fontSize: 16,
-    marginRight: 7,
   },
   label: {
     flex: 1,
@@ -114,5 +123,10 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: radius.pill,
     backgroundColor: 'rgba(255,255,255,0.45)',
+  },
+  flashOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    borderRadius: radius.pill,
   },
 });

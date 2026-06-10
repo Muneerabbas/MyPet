@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from './components/ActionButton';
 import { GlassCard } from './components/GlassCard';
+import { LevelUpModal } from './components/LevelUpModal';
 import { PetStage } from './components/PetStage';
 import { StatBar } from './components/StatBar';
 import { TopBar } from './components/TopBar';
@@ -12,9 +13,16 @@ import { gradients, spacing } from './theme';
 import { useSelector } from 'react-redux';
 import { RootState } from './store/store';
 import { useDispatch } from 'react-redux';
-import { applyOfflineDecay, getMood, setLastOpened } from './store/petSlice';
+import {
+  applyOfflineDecay,
+  getMood,
+  getStatusMessage,
+  setLastOpened,
+} from './store/petSlice';
 import { feedPet, playPet, sleepPet } from './store/petSlice';
 import { ACTION_POSE, DEFAULT_POSE, TAP_POSE } from './petPoses';
+
+const COINS_PER_LEVEL = 25;
 
 const backgroundImage = require('./assets/images/gameBack.png');
 const DEFAULT_STAT_DURATION = 650;
@@ -29,6 +37,20 @@ export const PetScreen: React.FC = () => {
 
   // Stat bars animate over this duration; synced to the running animation.
   const [statDuration, setStatDuration] = useState(DEFAULT_STAT_DURATION);
+
+  // Level-up celebration popup.
+  const [levelUp, setLevelUp] = useState<{ level: number; coins: number } | null>(
+    null,
+  );
+  const prevLevel = useRef(pet.level);
+
+  useEffect(() => {
+    if (pet.level > prevLevel.current) {
+      const gained = pet.level - prevLevel.current;
+      setLevelUp({ level: pet.level, coins: gained * COINS_PER_LEVEL });
+    }
+    prevLevel.current = pet.level;
+  }, [pet.level]);
 
   // The stat change is applied when the animation starts, so the bars fill
   // gradually over the same time the model is animating.
@@ -153,6 +175,7 @@ export const PetScreen: React.FC = () => {
             <ActionButton
               icon="🍔"
               label="Feed"
+              index={0}
               colors={gradients.feed}
               onPress={() => triggerAction(() => dispatch(feedPet()), ACTION_POSE.feed)}
             />
@@ -160,6 +183,7 @@ export const PetScreen: React.FC = () => {
             <ActionButton
               icon="🎾"
               label="Play"
+              index={1}
               colors={gradients.play}
               onPress={() => triggerAction(() => dispatch(playPet()), ACTION_POSE.play)}
             />
@@ -167,16 +191,24 @@ export const PetScreen: React.FC = () => {
             <ActionButton
               icon="😴"
               label="Sleep"
+              index={2}
               colors={gradients.sleep}
               onPress={() => triggerAction(() => dispatch(sleepPet()), ACTION_POSE.sleep)}
             />
           </View>
 
           <GlassCard style={styles.xpCard} strong>
-            <XPBar xp={pet.xp} message="Your pet is doing okay — keep it up!" />
+            <XPBar xp={pet.xp} message={getStatusMessage(pet)} />
           </GlassCard>
         </View>
       </View>
+
+      <LevelUpModal
+        visible={levelUp !== null}
+        level={levelUp?.level ?? pet.level}
+        coinsRewarded={levelUp?.coins ?? COINS_PER_LEVEL}
+        onClose={() => setLevelUp(null)}
+      />
     </ImageBackground>
   );
 };
