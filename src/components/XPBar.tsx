@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -14,26 +14,33 @@ interface XPBarProps {
 }
 
 export const XPBar: React.FC<XPBarProps> = ({ xp, message }) => {
+  const [trackWidth, setTrackWidth] = useState(0);
   const progress = useSharedValue(0);
 
+  const clampedXp = Math.max(0, Math.min(100, xp));
+
   useEffect(() => {
-    progress.value = withTiming(Math.max(0, Math.min(100, xp)), {
+    progress.value = withTiming(clampedXp / 100, {
       duration: 700,
       easing: Easing.out(Easing.cubic),
     });
-  }, [xp, progress]);
+  }, [clampedXp, progress]);
 
   const fillStyle = useAnimatedStyle(() => ({
-    width: `${progress.value}%`,
+    width: progress.value * trackWidth,
   }));
+
+  const onTrackLayout = (e: LayoutChangeEvent) => {
+    setTrackWidth(e.nativeEvent.layout.width);
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
         <Text style={styles.xpLabel}>XP</Text>
-        <Text style={styles.xpValue}>{Math.round(xp)}%</Text>
+        <Text style={styles.xpValue}>{Math.round(clampedXp)}%</Text>
       </View>
-      <View style={styles.track}>
+      <View style={styles.track} onLayout={onTrackLayout}>
         <Animated.View style={[styles.fill, fillStyle]}>
           <View style={styles.sheen} pointerEvents="none" />
         </Animated.View>
@@ -74,7 +81,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: radius.pill,
     backgroundColor: colors.xp,
-    minWidth: 12,
   },
   sheen: {
     position: 'absolute',

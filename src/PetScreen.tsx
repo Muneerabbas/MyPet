@@ -102,16 +102,8 @@ export const PetScreen: React.FC = () => {
     setStatDuration(DEFAULT_STAT_DURATION);
   };
 
- 
   const mood = getMood(pet);
-  const bubbleEmoji =
-    pose === ACTION_POSE.sleep
-      ? '💤'
-      : mood === 'happy'
-      ? '❤️'
-      : mood === 'sad'
-      ? '😢'
-      : null;
+  const sleeping = pose === ACTION_POSE.sleep;
 
   useEffect(() => {
     const now = Date.now();
@@ -175,7 +167,8 @@ export const PetScreen: React.FC = () => {
         <View style={styles.stageWrap}>
           <PetStage
             pose={pose}
-            bubbleEmoji={bubbleEmoji}
+            mood={mood}
+            sleeping={sleeping}
             onPoseComplete={handlePoseComplete}
             onPoseStart={handlePoseStart}
             onTap={() => {

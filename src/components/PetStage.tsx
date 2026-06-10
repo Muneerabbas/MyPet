@@ -1,11 +1,12 @@
 import React from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { ChickenViewer } from './ChickenViewer';
-import { MoodBubbles } from './MoodBubbles';
+import { MoodBox } from './MoodBox';
 
 interface PetStageProps {
   pose: string;
-  bubbleEmoji?: string | null;
+  mood: 'happy' | 'sad' | 'neutral';
+  sleeping?: boolean;
   onPoseComplete?: () => void;
   onPoseStart?: (durationMs: number) => void;
   onTap?: () => void;
@@ -13,7 +14,8 @@ interface PetStageProps {
 
 export const PetStage: React.FC<PetStageProps> = ({
   pose,
-  bubbleEmoji,
+  mood,
+  sleeping,
   onPoseComplete,
   onPoseStart,
   onTap,
@@ -31,7 +33,7 @@ export const PetStage: React.FC<PetStageProps> = ({
         onPoseStart={onPoseStart}
         onTap={onTap}
       />
-      <MoodBubbles emoji={bubbleEmoji} />
+      <MoodBox mood={mood} sleeping={sleeping} />
     </View>
   );
 };
