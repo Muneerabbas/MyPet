@@ -22,6 +22,7 @@ import {
 import { feedPet, playPet, sleepPet } from './store/petSlice';
 import { ACTION_POSE, DEFAULT_POSE, TAP_POSE } from './petPoses';
 import AudioManager, { EffectName } from './services/audioManager';
+import { hapticHit } from './utils/haptics';
 
 const COINS_PER_LEVEL = 25;
 
@@ -172,6 +173,7 @@ export const PetScreen: React.FC = () => {
             onPoseComplete={handlePoseComplete}
             onPoseStart={handlePoseStart}
             onTap={() => {
+              hapticHit();
               AudioManager.playEffect('hit');
               setPose(TAP_POSE);
             }}

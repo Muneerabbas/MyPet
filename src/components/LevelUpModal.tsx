@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { colors, radius, shadow, spacing } from '../theme';
+import { hapticTap } from '../utils/haptics';
 import { Gradient } from './Gradient';
 
 interface LevelUpModalProps {
@@ -66,6 +67,11 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({
     }
   }, [visible, backdrop, card, badgeSpin, badgePulse]);
 
+  const handleClose = () => {
+    hapticTap();
+    onClose();
+  };
+
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdrop.value }));
 
   const cardStyle = useAnimatedStyle(() => ({
@@ -114,7 +120,7 @@ export const LevelUpModal: React.FC<LevelUpModalProps> = ({
             <Text style={styles.rewardText}>+{coinsRewarded} coins</Text>
           </View>
 
-          <Pressable onPress={onClose} style={({ pressed }) => [pressed && styles.btnPressed]}>
+          <Pressable onPress={handleClose} style={({ pressed }) => [pressed && styles.btnPressed]}>
             <Gradient
               colors={[colors.xp, '#7C6CFF']}
               borderRadius={radius.md}

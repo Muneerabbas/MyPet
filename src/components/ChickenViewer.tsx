@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import WebView, { WebViewMessageEvent } from 'react-native-webview';
 import { loadGlbDataUri } from '../utils/loadGlbDataUri';
+import { resolveWebViewModelUri } from '../utils/resolveAssetUri';
 import { MODEL_VIEWER_JS_B64 } from '../utils/modelViewerSource';
 
 /**
@@ -200,28 +201,37 @@ export const ChickenViewer: React.FC<ChickenViewerProps> = ({
 }) => {
   const webViewRef = useRef<WebView>(null);
   const readyRef = useRef(false);
-  const [modelDataUri, setModelDataUri] = useState<string | null>(null);
+  const [modelUri, setModelUri] = useState<string | null>(null);
+  const [baseUrl, setBaseUrl] = useState('https://app.local');
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const glbModule = require('../assets/model/chicken.glb');
 
-    loadGlbDataUri(require('../assets/model/chicken.glb'))
-      .then((uri) => {
-        if (!cancelled) {
-          setModelDataUri(uri);
-          setLoadError(null);
-        }
-      })
-      .catch((err: Error) => {
-        if (!cancelled) {
-          setLoadError(err.message);
-        }
-      });
+    if (__DEV__) {
+      // Dev: Metro serves assets over HTTP. Fetch and embed as data URI so the
+      // WebView never makes a cross-origin request to Metro (which rejects
+      // requests from non-localhost origins).
+      loadGlbDataUri(glbModule)
+        .then((uri) => {
+          if (!cancelled) {
+            setModelUri(uri);
+            setBaseUrl('https://app.local');
+          }
+        })
+        .catch((err: Error) => {
+          if (!cancelled) setLoadError(err.message);
+        });
+    } else {
+      // Release: resolve the bundled asset path synchronously and pass it
+      // directly to model-viewer — no JS fetch needed.
+      const resolved = resolveWebViewModelUri(glbModule);
+      setModelUri(resolved.modelUri);
+      setBaseUrl(resolved.baseUrl);
+    }
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const sendPose = useCallback((next: string) => {
@@ -266,31 +276,32 @@ export const ChickenViewer: React.FC<ChickenViewerProps> = ({
 
   return (
     <View style={[styles.wrap, { width, height }, style]}>
-      {modelDataUri ? (
-        <WebView
-          ref={webViewRef}
-          source={{ html: buildHtml(modelDataUri), baseUrl: 'https://app.local' }}
-          style={styles.webview}
-          scrollEnabled={false}
-          bounces={false}
-          overScrollMode="never"
-          showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={false}
-          originWhitelist={['*']}
-          javaScriptEnabled
-          domStorageEnabled
-          allowFileAccess
-          allowFileAccessFromFileURLs
-          allowUniversalAccessFromFileURLs
-          mixedContentMode="always"
-          androidLayerType="hardware"
-          webviewDebuggingEnabled={__DEV__}
-          onMessage={onMessage}
-          onError={(e) => setLoadError(e.nativeEvent.description)}
-          {...(Platform.OS === 'ios' ? { opaque: false } : {})}
-        />
-      ) : loadError ? null : (
+      {!modelUri && !loadError && (
         <ActivityIndicator style={styles.loader} color="#fff" />
+      )}
+      {modelUri && (
+      <WebView
+        ref={webViewRef}
+        source={{ html: buildHtml(modelUri), baseUrl }}
+        style={styles.webview}
+        scrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        originWhitelist={['*']}
+        javaScriptEnabled
+        domStorageEnabled
+        allowFileAccess
+        allowFileAccessFromFileURLs
+        allowUniversalAccessFromFileURLs
+        mixedContentMode="always"
+        androidLayerType="hardware"
+        webviewDebuggingEnabled={__DEV__}
+        onMessage={onMessage}
+        onError={(e) => setLoadError(e.nativeEvent.description)}
+        {...(Platform.OS === 'ios' ? { opaque: false } : {})}
+      />
       )}
 
       {loadError ? (

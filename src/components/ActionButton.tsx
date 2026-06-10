@@ -1,6 +1,5 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -10,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { colors, radius, shadow } from '../theme';
+import { hapticTap } from '../utils/haptics';
 import { Gradient } from './Gradient';
 
 interface ActionButtonProps {
@@ -22,17 +22,6 @@ interface ActionButtonProps {
 }
 
 const SPRING = { damping: 12, stiffness: 220, mass: 0.6 };
-
-const triggerHaptic = () => {
-  try {
-    ReactNativeHapticFeedback.trigger('impactLight', {
-      enableVibrateFallback: true,
-      ignoreAndroidSystemSettings: false,
-    });
-  } catch {
-    // Haptics are best-effort; ignore if unavailable.
-  }
-};
 
 export const ActionButton: React.FC<ActionButtonProps> = ({
   icon,
@@ -64,7 +53,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   };
 
   const handlePress = () => {
-    triggerHaptic();
+    hapticTap();
     // Playful icon pop on each press.
     iconScale.value = withSequence(
       withSpring(1.28, { damping: 8, stiffness: 260 }),

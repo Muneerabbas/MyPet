@@ -19,6 +19,7 @@ const MAX_EFFECT_MS = 5000; // effects are cut off after 5s; only music loops.
 
 class AudioManager {
   private bgMusic: Sound | null = null;
+  private musicPlaying = false;
   private effects: Partial<Record<EffectName, Sound>> = {};
   private effectTimers: Partial<Record<EffectName, ReturnType<typeof setTimeout>>> =
     {};
@@ -28,6 +29,7 @@ class AudioManager {
       return;
     }
 
+    this.musicPlaying = true;
     this.bgMusic = new Sound('bg_music.mp3', Sound.MAIN_BUNDLE, error => {
       if (error) {
         console.log('Failed to load music', error);
@@ -37,11 +39,23 @@ class AudioManager {
       this.bgMusic?.setNumberOfLoops(-1); // infinite
       // Music sits lower so the (maxed) effects come through louder.
       this.bgMusic?.setVolume(0.2);
-      this.bgMusic?.play();
+      this.playMusicLoop();
+    });
+  }
+
+  // setNumberOfLoops(-1) is unreliable on some Android builds, so we also
+  // restart from the beginning whenever playback finishes on its own.
+  private playMusicLoop() {
+    this.bgMusic?.play(success => {
+      if (success && this.musicPlaying && this.bgMusic) {
+        this.bgMusic.setCurrentTime(0);
+        this.playMusicLoop();
+      }
     });
   }
 
   stopMusic() {
+    this.musicPlaying = false;
     this.bgMusic?.stop();
     this.bgMusic?.release();
     this.bgMusic = null;
